@@ -2,6 +2,8 @@
 
 ![conformance: mock 19/19, faults 10/10](badge.svg)
 
+[![conformance](https://github.com/saylee21/openai-gateway-conformance/actions/workflows/conformance.yml/badge.svg)](https://github.com/saylee21/openai-gateway-conformance/actions/workflows/conformance.yml)
+
 A CPU-first contract suite for OpenAI-compatible LLM gateways.
 
 Most gateway tests check that the JSON parses. This suite checks the promises a client actually depends on: a cut answer says `length`, usage adds up, request ids survive the hop, a stream has one finish event, usage arrives after finish, deltas are deltas, and a buffered proxy cannot fake a fast first token.
