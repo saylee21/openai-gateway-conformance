@@ -7,7 +7,7 @@ A gateway returns:
 ```json
 {
   "usage": {
-    "prompt_tokens": 9,
+    "prompt_tokens": 7,
     "completion_tokens": 16,
     "total_tokens": 16
   }
@@ -31,13 +31,13 @@ curl -s http://127.0.0.1:8003/v1/chat/completions \
 Observed:
 
 ```json
-{"prompt_tokens": 9, "completion_tokens": 16, "total_tokens": 16}
+{"prompt_tokens": 7, "completion_tokens": 16, "total_tokens": 16}
 ```
 
 Expected:
 
 ```json
-{"prompt_tokens": 9, "completion_tokens": 16, "total_tokens": 25}
+{"prompt_tokens": 7, "completion_tokens": 16, "total_tokens": 23}
 ```
 
 The `mangle-usage` fault proxy produces this on purpose.
