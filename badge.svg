@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="250" height="24" role="img" aria-label="conformance: mock 19/19, faults 10/10">
+  <title>conformance: mock 19/19, faults 10/10</title>
+  <linearGradient id="g" x2="0" y2="100%">
+    <stop offset="0" stop-color="#fff" stop-opacity=".7"/>
+    <stop offset="1" stop-opacity=".1"/>
+  </linearGradient>
+  <rect width="250" height="24" rx="4" fill="#555"/>
+  <rect x="93" width="157" height="24" rx="4" fill="#7c3aed"/>
+  <rect x="93" width="4" height="24" fill="#7c3aed"/>
+  <rect width="250" height="24" rx="4" fill="url(#g)"/>
+  <g fill="#fff" text-anchor="middle" font-family="Verdana,DejaVu Sans,sans-serif" font-size="11">
+    <text x="46.5" y="17">conformance</text>
+    <text x="171.5" y="17">mock 19/19  faults 10/10</text>
+  </g>
+</svg>

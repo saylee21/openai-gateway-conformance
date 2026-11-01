@@ -1,0 +1,9 @@
+model_list:
+  - model_name: mock-small
+    litellm_params:
+      model: openai/mock-small
+      api_base: http://127.0.0.1:8010/v1
+      api_key: test
+
+general_settings:
+  master_key: os.environ/LITELLM_MASTER_KEY
