@@ -8,7 +8,7 @@ A CPU-first contract suite for OpenAI-compatible LLM gateways.
 
 Most gateway tests check that the JSON parses. This suite checks the promises a client actually depends on: a cut answer says `length`, usage adds up, request ids survive the hop, a stream has one finish event, usage arrives after finish, deltas are deltas, and a buffered proxy cannot fake a fast first token.
 
-**Current result:** 19 of 19 tests pass against the contract-correct mock. 10 of 10 injected fault modes are caught. LiteLLM 1.106.0 passes 15 of 19 and exposes four gaps. See [reports/001-mock.md](reports/001-mock.md) and [reports/002-litellm.md](reports/002-litellm.md).
+**Current result:** 19 of 19 tests pass against the contract-correct mock. 10 of 10 injected fault modes are caught. LiteLLM 1.108.0 passes 15 of 19 and exposes the same four gaps first recorded on 1.106.0. See [reports/001-mock.md](reports/001-mock.md), [reports/002-litellm.md](reports/002-litellm.md), and [reports/003-litellm-1.108.md](reports/003-litellm-1.108.md).
 
 This is not a certification. It is a reproducible way to find a gateway that is lying politely.
 
