@@ -2,6 +2,9 @@
 
 Run date: 2026-11-01
 
+Note added 2026-11-06: the suite now has 20 tests. This report records the
+19-test run of 2026-11-01.
+
 ## Environment
 
 - macOS, arm64

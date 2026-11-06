@@ -1,6 +1,6 @@
 # OpenAI Gateway Conformance
 
-![conformance: mock 19/19, faults 10/10](badge.svg)
+![conformance: mock 20/20, faults 11/11](badge.svg)
 
 [![conformance](https://github.com/saylee21/openai-gateway-conformance/actions/workflows/conformance.yml/badge.svg)](https://github.com/saylee21/openai-gateway-conformance/actions/workflows/conformance.yml)
 
@@ -8,7 +8,7 @@ A CPU-first contract suite for OpenAI-compatible LLM gateways.
 
 Most gateway tests check that the JSON parses. This suite checks the promises a client actually depends on: a cut answer says `length`, usage adds up, request ids survive the hop, a stream has one finish event, usage arrives after finish, deltas are deltas, and a buffered proxy cannot fake a fast first token.
 
-**Current result:** 19 of 19 tests pass against the contract-correct mock. 10 of 10 injected fault modes are caught. LiteLLM 1.108.0 passes 15 of 19 and exposes the same four gaps first recorded on 1.106.0. See [reports/001-mock.md](reports/001-mock.md), [reports/002-litellm.md](reports/002-litellm.md), and [reports/003-litellm-1.108.md](reports/003-litellm-1.108.md).
+**Current result:** 20 of 20 tests pass against the contract-correct mock. 11 of 11 injected fault modes are caught. LiteLLM 1.108.0 passes 16 of 20 and exposes the same four gaps first recorded on 1.106.0. See [reports/001-mock.md](reports/001-mock.md), [reports/002-litellm.md](reports/002-litellm.md), [reports/003-litellm-1.108.md](reports/003-litellm-1.108.md), and [reports/004-tool-calls.md](reports/004-tool-calls.md).
 
 This is not a certification. It is a reproducible way to find a gateway that is lying politely.
 
@@ -26,6 +26,7 @@ This is not a certification. It is a reproducible way to find a gateway that is 
 | Stream timing | tokens arrive over time, not in one buffered write |
 | Stream usage | usage is sent after finish, not before it |
 | Stream deltas | each delta is new text, not the whole answer so far |
+| Tool calls | streamed argument fragments reassemble to the exact JSON string, including a boundary after a backslash |
 
 ## Quickstart
 
@@ -41,7 +42,7 @@ python3 mock_server_fixed.py --port 8010
 MOCK_BASE_URL=http://127.0.0.1:8010 pytest -v
 ```
 
-Expected: `19 passed`.
+Expected: `20 passed`.
 
 The default mock sleeps 500 ms in prefill and 40 ms per token, so the full suite takes about 30 seconds. For a faster local run:
 
@@ -52,11 +53,11 @@ MOCK_PREFILL_MS=50 MOCK_DECODE_MS=20 MOCK_PREFILL_PER_TOKEN_MS=0.02 \
 MOCK_BASE_URL=http://127.0.0.1:8010 pytest -v
 ```
 
-Expected: `19 passed in about 6 seconds`.
+Expected: `20 passed in about 6 seconds`.
 
 ## Run the fault matrix
 
-The matrix starts the buggy server, the fixed server, and one fault proxy per mode, then runs the same 19 tests against each endpoint.
+The matrix starts the buggy server, the fixed server, and one fault proxy per mode, then runs the same 20 tests against each endpoint.
 
 ```bash
 python3 run_matrix.py
@@ -66,12 +67,12 @@ Expected summary:
 
 ```text
 fixed baseline failures: 0
-buggy baseline failures: 3
+buggy baseline failures: 4
 ...
-10 of 10 fault modes were caught
+11 of 11 fault modes were caught
 ```
 
-The buggy baseline has two seeded defects but three failures because `finish_reason` is wrong in both the non-streaming and streaming paths.
+The buggy baseline has two seeded defects and no tool-call support, so four failures.
 
 ## Fault modes
 
@@ -87,6 +88,7 @@ The buggy baseline has two seeded defects but three failures because `finish_rea
 | `duplicate-finish` | sends the finish event twice | `stream_has_one_finish` |
 | `usage-before-finish` | moves usage ahead of finish | `stream_usage_comes_after_finish` |
 | `cumulative-deltas` | rewrites every delta as the whole answer so far | `stream_deltas_are_not_cumulative` |
+| `tool-escape` | doubles every backslash in streamed tool-call arguments | `stream_tool_call_arguments_split_after_backslash` |
 
 ## Test a real gateway
 
@@ -125,13 +127,19 @@ MOCK_API_KEY=sk-local \
 pytest -v
 ```
 
-Result: 15 passed, 4 failed. The failures are in [reports/002-litellm.md](reports/002-litellm.md).
+Result: 15 passed, 4 failed on the 19-test suite of that date. The failures are in [reports/002-litellm.md](reports/002-litellm.md).
+
+## LiteLLM 1.108.0 run
+
+The same four gaps reproduce on 1.108.0. The tool-call boundary test was added afterwards and passes through LiteLLM, so the current result is 16 passed, 4 failed on 20 tests.
+
+Details are in [reports/003-litellm-1.108.md](reports/003-litellm-1.108.md) and [reports/004-tool-calls.md](reports/004-tool-calls.md). The four failures remain one finding each in Reports 002 and 003. The tool-call pass is not a claim that every gateway handles the boundary; it is one fixture on one version.
 
 ## Repository layout
 
 ```text
 conftest.py            fixtures for the OpenAI SDK, raw httpx, and auth
-test_contract.py       19 contract tests
+test_contract.py       20 contract tests
 mock_server_fixed.py   contract-correct mock
 mock_server.py         intentionally buggy mock with two seeded defects
 fault_proxy.py         one fault mode at a time, standard library only

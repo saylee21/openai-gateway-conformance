@@ -34,6 +34,14 @@ BASE_SENTENCE = (
     "and later tokens are cheap but not free."
 )
 
+# Tool-call fixture. The arguments string is split right after a backslash,
+# which is the boundary a gateway gets wrong when it re-encodes each chunk.
+TOOL_CALL_NAME = "write_file"
+TOOL_CALL_ARGS = {
+    "path": "C:\\Users\\saylee\\notes.txt",
+    "pattern": "\\d+\\s*",
+}
+
 try:
     import tiktoken
     ENC = tiktoken.get_encoding("cl100k_base")
@@ -123,6 +131,13 @@ class Handler(BaseHTTPRequestHandler):
         # Pretend prefill.
         time.sleep((PREFILL_BASE_MS + prompt_tokens * PREFILL_PER_TOKEN_MS) / 1000.0)
 
+        if req.get("tools"):
+            if stream:
+                self._stream_tool_call(model, prompt_tokens, include_usage)
+            else:
+                self._tool_call(model, prompt_tokens)
+            return
+
         words = (BASE_SENTENCE % prompt_tokens).split()
         tokens = words[:max_tokens]
         finish_reason = "length" if len(tokens) < len(words) else "stop"
@@ -148,6 +163,88 @@ class Handler(BaseHTTPRequestHandler):
                       "completion_tokens": len(tokens),
                       "total_tokens": prompt_tokens + len(tokens)},
         })
+
+    def _tool_call(self, model, prompt_tokens):
+        args = json.dumps(TOOL_CALL_ARGS)
+        completion_tokens = count_tokens(args)
+        self._json(200, {
+            "id": "chatcmpl-" + uuid.uuid4().hex[:12],
+            "object": "chat.completion",
+            "created": int(now()),
+            "model": model,
+            "choices": [{
+                "index": 0,
+                "message": {
+                    "role": "assistant",
+                    "content": None,
+                    "tool_calls": [{
+                        "id": "call_" + uuid.uuid4().hex[:12],
+                        "type": "function",
+                        "function": {"name": TOOL_CALL_NAME, "arguments": args},
+                    }],
+                },
+                "finish_reason": "tool_calls",
+            }],
+            "usage": {"prompt_tokens": prompt_tokens,
+                      "completion_tokens": completion_tokens,
+                      "total_tokens": prompt_tokens + completion_tokens},
+        })
+
+    def _stream_tool_call(self, model, prompt_tokens, include_usage):
+        cid = "chatcmpl-" + uuid.uuid4().hex[:12]
+        created = int(now())
+        tool_id = "call_" + uuid.uuid4().hex[:12]
+        args = json.dumps(TOOL_CALL_ARGS)
+        completion_tokens = count_tokens(args)
+
+        # Split inside the first escaped separator so the first fragment ends
+        # with a single backslash. A naive per-chunk JSON parser breaks here.
+        cut = args.index("\\\\") + 1
+        rest = args[cut:]
+        mid = len(rest) // 2
+        fragments = [args[:cut], rest[:mid], rest[mid:]]
+
+        self.send_response(200)
+        self.send_header("Content-Type", "text/event-stream")
+        self.send_header("Cache-Control", "no-cache")
+        self.send_header("Connection", "close")
+        self.send_header("X-Request-Id", self.request_id)
+        self.end_headers()
+        self.close_connection = True
+
+        def send(obj):
+            self.wfile.write(("data: " + json.dumps(obj) + "\n\n").encode())
+            self.wfile.flush()
+
+        def chunk(delta, finish=None):
+            return {"id": cid, "object": "chat.completion.chunk", "created": created,
+                    "model": model, "choices": [{"index": 0, "delta": delta,
+                                                 "finish_reason": finish}]}
+
+        try:
+            send(chunk({
+                "role": "assistant",
+                "tool_calls": [{
+                    "index": 0, "id": tool_id, "type": "function",
+                    "function": {"name": TOOL_CALL_NAME, "arguments": ""},
+                }],
+            }))
+            for fragment in fragments:
+                time.sleep(DECODE_MS / 1000.0)
+                send(chunk({"tool_calls": [{"index": 0,
+                                            "function": {"arguments": fragment}}]}))
+            send(chunk({}, "tool_calls"))
+            if include_usage:
+                send({"id": cid, "object": "chat.completion.chunk",
+                      "created": created, "model": model, "choices": [],
+                      "usage": {"prompt_tokens": prompt_tokens,
+                                "completion_tokens": completion_tokens,
+                                "total_tokens": prompt_tokens + completion_tokens}})
+            self.wfile.write(b"data: [DONE]\n\n")
+            self.wfile.flush()
+        except (BrokenPipeError, ConnectionResetError):
+            print("[%s] client disconnected mid-tool-call after %s"
+                  % (time.strftime("%H:%M:%S"), self.request_id), flush=True)
 
     def _stream(self, tokens, model, prompt_tokens, include_usage, finish_reason):
         cid = "chatcmpl-" + uuid.uuid4().hex[:12]

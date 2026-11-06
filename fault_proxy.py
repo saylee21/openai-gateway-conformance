@@ -19,6 +19,7 @@ Modes:
   duplicate-finish send the finish_reason event twice
   usage-before-finish move the usage chunk ahead of finish_reason
   cumulative-deltas rewrite every content delta as the whole answer so far
+  tool-escape      double every backslash in streamed tool-call arguments
 
 The proxy only rewrites the response. It never touches the request body.
 """
@@ -39,6 +40,7 @@ MODES = [
     "duplicate-finish",
     "usage-before-finish",
     "cumulative-deltas",
+    "tool-escape",
 ]
 
 UPSTREAM_HOST = "127.0.0.1"
@@ -178,6 +180,27 @@ class ProxyHandler(BaseHTTPRequestHandler):
             return line, so_far
         return b"data: " + json.dumps(obj).encode(), so_far
 
+    @classmethod
+    def _double_tool_escape(cls, line):
+        if not line.startswith(b"data: {"):
+            return line
+        try:
+            obj = json.loads(line[len(b"data: "):])
+        except Exception:
+            return line
+        changed = False
+        for choice in obj.get("choices") or []:
+            delta = choice.get("delta") or {}
+            for call in delta.get("tool_calls") or []:
+                function = call.get("function") or {}
+                args = function.get("arguments")
+                if isinstance(args, str) and "\\" in args:
+                    function["arguments"] = args.replace("\\", "\\\\")
+                    changed = True
+        if not changed:
+            return line
+        return b"data: " + json.dumps(obj).encode()
+
     def _relay_stream(self, resp):
         self._send_headers(resp)
 
@@ -238,6 +261,9 @@ class ProxyHandler(BaseHTTPRequestHandler):
 
             if MODE == "cumulative-deltas":
                 line, cumulative = self._cumulative_line(line, cumulative)
+
+            if MODE == "tool-escape":
+                line = self._double_tool_escape(line)
 
             self.wfile.write(line + b"\n")
             self.wfile.flush()

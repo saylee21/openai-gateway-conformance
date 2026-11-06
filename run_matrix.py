@@ -41,6 +41,7 @@ SCENARIOS = [
     ("dupf", 8008, "duplicate-finish"),
     ("ord", 8009, "usage-before-finish"),
     ("cum", 8011, "cumulative-deltas"),
+    ("targs", 8012, "tool-escape"),
 ]
 
 

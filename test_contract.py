@@ -321,6 +321,60 @@ def test_stream_deltas_are_not_cumulative(http, chat_body):
     )
 
 
+# ---------------------------------------------------------------------------
+# Tool calls
+# ---------------------------------------------------------------------------
+
+TOOL_DEFINITION = [{
+    "type": "function",
+    "function": {
+        "name": "write_file",
+        "description": "Write text to a file.",
+        "parameters": {
+            "type": "object",
+            "properties": {"path": {"type": "string"}},
+            "required": ["path"],
+        },
+    },
+}]
+
+TOOL_CALL_EXPECTED = {
+    "path": "C:\\Users\\saylee\\notes.txt",
+    "pattern": "\\d+\\s*",
+}
+
+
+def test_stream_tool_call_arguments_split_after_backslash(http, chat_body):
+    events = _stream_events(
+        http,
+        chat_body,
+        max_tokens=8,
+        tools=TOOL_DEFINITION,
+        tool_choice="auto",
+    )
+
+    fragments = []
+    for event in events:
+        for choice in event.get("choices") or []:
+            delta = choice.get("delta") or {}
+            for call in delta.get("tool_calls") or []:
+                text = (call.get("function") or {}).get("arguments")
+                if text:
+                    fragments.append(text)
+
+    assert fragments, "stream never sent tool call arguments"
+    assert all(isinstance(f, str) for f in fragments), (
+        "arguments must be a JSON string, not a parsed object"
+    )
+
+    joined = "".join(fragments)
+    parsed = json.loads(joined)
+    assert parsed == TOOL_CALL_EXPECTED, (
+        "tool call fragments did not reassemble; a gateway that re-encodes "
+        "or trims a fragment corrupts the JSON"
+    )
+
+
 def test_sdk_raises_typed_error(client):
     with pytest.raises(NotFoundError):
         client.chat.completions.create(
